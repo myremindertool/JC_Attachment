@@ -55,7 +55,22 @@ st.markdown("""
             color: #444;
             font-weight: 600;
         }
-    </style>
+            input, textarea {
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        .stTextInput>div>div>input, .stDateInput input, .stSelectbox>div>div, .stMultiSelect>div>div, .stTextArea textarea {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 0.6rem;
+            font-size: 1rem;
+        }
+        label {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        </style>
 """, unsafe_allow_html=True)
 st.markdown("""
     <div style='background: linear-gradient(to right, #00b09b, #96c93d); padding: 2rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); text-align: center;'>
