@@ -42,7 +42,7 @@ with col1:
     save_creds = st.checkbox("Remember credentials (store locally)")
     mailbox_options = ["inbox", "[Gmail]/Sent Mail", "[Gmail]/All Mail", "[Gmail]/Drafts", "[Gmail]/Starred", "[Gmail]/Important", "[Gmail]/Spam", "[Gmail]/Trash"]
     mailbox = st.selectbox("📂 Folder/Label to search", options=mailbox_options, index=0)
-    # save_folder = st.text_input("💾 Folder to save attachments", value="downloads")
+    save_folder = "downloads"
 
 with col2:
     start_date = st.date_input("📅 Start Date", value=datetime.date.today().replace(day=1))
