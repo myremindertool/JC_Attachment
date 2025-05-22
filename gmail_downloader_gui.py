@@ -40,7 +40,22 @@ with col1:
     save_creds = st.checkbox("Remember credentials (store locally)")
     mailbox_options = ["inbox", "[Gmail]/Sent Mail", "[Gmail]/All Mail", "[Gmail]/Drafts", "[Gmail]/Starred", "[Gmail]/Important", "[Gmail]/Spam", "[Gmail]/Trash"]
     mailbox = st.selectbox("📂 Folder/Label to search", options=mailbox_options, index=0)
-    save_folder = st.text_input("💾 Folder to save attachments", value="C:/GmailDownloader")
+    import tkinter as tk
+from tkinter import filedialog
+
+save_folder = st.text_input("💾 Folder to save attachments (or leave blank to select)", value="")
+
+if not save_folder:
+    if st.button("📂 Select Folder"):
+        root = tk.Tk()
+        root.withdraw()
+        selected_folder = filedialog.askdirectory()
+        if selected_folder:
+            st.session_state['selected_folder'] = selected_folder
+
+    if 'selected_folder' in st.session_state:
+        save_folder = st.session_state['selected_folder']
+        st.success(f"Selected folder: {save_folder}")
 
 with col2:
     start_date = st.date_input("📅 Start Date", value=datetime.date.today().replace(day=1))
@@ -141,8 +156,11 @@ if st.button("🚀 Start Download"):
 
                         filepath = os.path.join(full_path, decoded_filename)
                         if os.path.exists(filepath):
-                            log.append(f"⚠️ Skipped (duplicate): {decoded_filename}")
-                            continue
+                            base, ext = os.path.splitext(decoded_filename)
+                            counter = 1
+                            while os.path.exists(filepath):
+                                filepath = os.path.join(full_path, f"{base}_{counter}{ext}")
+                                counter += 1
 
                         with open(filepath, "wb") as f:
                             f.write(part.get_payload(decode=True))
@@ -159,6 +177,7 @@ if st.button("🚀 Start Download"):
     end_time = datetime.datetime.now()
     duration = (end_time - start_time).seconds
     log.append(f"\n⏱️ Time taken: {duration} seconds")
+    log.append(f"📁 Files saved in: {save_folder}")
     log.append("✅ Done.")
     status_text.text("✔️ Complete.")
     log_box.text("\n".join(log[-10:]))
