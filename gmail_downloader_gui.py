@@ -33,7 +33,7 @@ st.caption("Automatically fetch attachments from Gmail or Outlook with filters a
 
 creds = load_credentials()
 account_type = st.selectbox("📡 Email Provider", ["Gmail", "Outlook"], index=0, key="account_type")
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
 with col1:
     email_user = st.text_input("📧 Email Address", value=creds.get("email", ""))
@@ -56,15 +56,21 @@ custom_types = st.text_input("➕ Add custom file types (comma-separated: .mp3, 
 if custom_types:
     file_types += [ft.strip() for ft in custom_types.split(",") if ft.strip().startswith(".")]
 
+# --- Execution Controls & Log UI ---
+st.markdown("---")
+status_text = st.empty()
 progress = st.empty()
 log_box = st.empty()
-status_text = st.empty()
-stop_button = st.button("🛑 Stop")
+col_stop, col_start = st.columns([1, 6])
+with col_stop:
+    stop_button = st.button("🛑 Stop")
+with col_start:
+    start_button = st.button("🚀 Start Download")
 
 if stop_button:
     st.session_state["stop_requested"] = True
 
-if st.button("🚀 Start Download"):
+if start_button:
     st.session_state["stop_requested"] = False
     start_time = datetime.datetime.now()
     log = []
