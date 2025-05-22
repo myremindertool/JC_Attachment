@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 
 # --- Setup ---
+import zipfile
+import io
 CONFIG_FILE = Path("config.json")
 st.session_state.setdefault("stop_requested", False)
 
@@ -156,6 +158,15 @@ if st.button("🚀 Start Download"):
 
         imap.logout()
 
+        # Create zip of saved files
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(save_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    zipf.write(file_path, arcname=os.path.relpath(file_path, save_folder))
+        zip_buffer.seek(0)
+
     except Exception as e:
         log.append(f"❌ Error: {str(e)}")
 
@@ -165,4 +176,5 @@ if st.button("🚀 Start Download"):
     log.append(f"📁 Files saved in: {save_folder}")
     log.append("✅ Done.")
     status_text.text("✔️ Complete.")
+    st.download_button(label="⬇️ Download Attachments (ZIP)", data=zip_buffer, file_name="attachments.zip", mime="application/zip")
     log_box.text("\n".join(log[-10:]))
