@@ -7,6 +7,8 @@ import os
 import datetime
 import json
 from pathlib import Path
+import zipfile
+import io
 
 # --- Setup ---
 CONFIG_FILE = Path("config.json")
@@ -31,7 +33,7 @@ st.caption("Automatically fetch attachments from Gmail or Outlook with filters a
 
 creds = load_credentials()
 account_type = st.selectbox("📡 Email Provider", ["Gmail", "Outlook"], index=0, key="account_type")
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
 with col1:
     email_user = st.text_input("📧 Email Address", value=creds.get("email", ""))
@@ -40,29 +42,35 @@ with col1:
     save_creds = st.checkbox("Remember credentials (store locally)")
     mailbox_options = ["inbox", "[Gmail]/Sent Mail", "[Gmail]/All Mail", "[Gmail]/Drafts", "[Gmail]/Starred", "[Gmail]/Important", "[Gmail]/Spam", "[Gmail]/Trash"]
     mailbox = st.selectbox("📂 Folder/Label to search", options=mailbox_options, index=0)
-    save_folder = st.text_input("💾 Folder to save attachments", value="C:/GmailDownloader")
+    save_folder = "downloads"
 
 with col2:
     start_date = st.date_input("📅 Start Date", value=datetime.date.today().replace(day=1))
     end_date = st.date_input("📅 End Date", value=datetime.date.today())
     subject_filter = st.text_input("🔍 Subject contains")
     sender_filter = st.text_input("👤 Sender contains")
-    body_filters = st.text_input("✉️ Body contains (comma-separated: joju, cv, resume)")
+    body_filters = st.text_input("✉️ Body contains (comma-separated: rsm, cv, resume)")
+    file_types = st.multiselect("📎 Attachment types to download", [".pdf", ".docx", ".jpg", ".png"], default=[".pdf", ".docx"])
+    custom_types = st.text_input("➕ Add custom file types (comma-separated: .mp3, .zip)")
+    if custom_types:
+        file_types += [ft.strip() for ft in custom_types.split(",") if ft.strip().startswith(".")]
 
-file_types = st.multiselect("📎 Attachment types to download", [".pdf", ".docx", ".jpg", ".png"], default=[".pdf", ".docx"])
-custom_types = st.text_input("➕ Add custom file types (comma-separated: .mp3, .zip)")
-if custom_types:
-    file_types += [ft.strip() for ft in custom_types.split(",") if ft.strip().startswith(".")]
+# --- Buttons and Logging ---
+st.markdown("---")
+col_stop, col_start = st.columns([1, 6])
+with col_stop:
+    stop_button = st.button("🛑 Stop")
+with col_start:
+    start_button = st.button("🚀 Start Download")
 
+status_text = st.empty()
 progress = st.empty()
 log_box = st.empty()
-status_text = st.empty()
-stop_button = st.button("🛑 Stop")
 
 if stop_button:
     st.session_state["stop_requested"] = True
 
-if st.button("🚀 Start Download"):
+if start_button:
     st.session_state["stop_requested"] = False
     start_time = datetime.datetime.now()
     log = []
@@ -141,8 +149,11 @@ if st.button("🚀 Start Download"):
 
                         filepath = os.path.join(full_path, decoded_filename)
                         if os.path.exists(filepath):
-                            log.append(f"⚠️ Skipped (duplicate): {decoded_filename}")
-                            continue
+                            base, ext = os.path.splitext(decoded_filename)
+                            counter = 1
+                            while os.path.exists(filepath):
+                                filepath = os.path.join(full_path, f"{base}_{counter}{ext}")
+                                counter += 1
 
                         with open(filepath, "wb") as f:
                             f.write(part.get_payload(decode=True))
@@ -153,12 +164,23 @@ if st.button("🚀 Start Download"):
 
         imap.logout()
 
+        # Create zip of saved files
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(save_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    zipf.write(file_path, arcname=os.path.relpath(file_path, save_folder))
+        zip_buffer.seek(0)
+
     except Exception as e:
         log.append(f"❌ Error: {str(e)}")
 
     end_time = datetime.datetime.now()
     duration = (end_time - start_time).seconds
     log.append(f"\n⏱️ Time taken: {duration} seconds")
+    log.append(f"📁 Files saved in: {save_folder}")
     log.append("✅ Done.")
     status_text.text("✔️ Complete.")
     log_box.text("\n".join(log[-10:]))
+    st.download_button(label="⬇️ Download Attachments (ZIP)", data=zip_buffer, file_name="attachments.zip", mime="application/zip")
