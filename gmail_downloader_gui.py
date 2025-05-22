@@ -14,59 +14,70 @@ import io
 CONFIG_FILE = Path("config.json")
 st.session_state.setdefault("stop_requested", False)
 
+# --- Load saved credentials if available ---
 def load_credentials():
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, "r") as f:
             return json.load(f)
     return {"email": "", "password": ""}
 
+# --- Save credentials to config file ---
 def save_credentials(email, password):
     with open(CONFIG_FILE, "w") as f:
         json.dump({"email": email, "password": password}, f)
 
-# --- UI Styling ---
+# --- Main App Layout ---
 st.set_page_config(page_title="📥 JC Attachment Downloader", page_icon="📬", layout="wide")
 st.markdown("""
     <style>
-        body { background-color: #f8f9fa; }
+        body {
+            background-color: #f8f9fa;
+        }
         .block-container {
-            padding: 2rem;
-            background-color: #ffffff;
+            padding: 2rem 2rem 2rem 2rem;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            background-color: #ffffff;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.05);
         }
         .stButton>button {
+            border-radius: 8px;
+            color: white;
             background: linear-gradient(90deg, #2b5876 0%, #4e4376 100%);
-            color: white; border-radius: 8px; padding: 0.6rem 1.2rem;
+            padding: 0.6rem 1.2rem;
         }
         .stDownloadButton>button {
+            border-radius: 8px;
+            color: white;
             background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
-            color: white; border-radius: 8px; padding: 0.6rem 1.2rem;
+            padding: 0.6rem 1.2rem;
         }
-        .stCheckbox>label, .stSelectbox>label, .stTextInput>label, 
-        .stDateInput>label, .stMultiSelect>label {
-            color: #444; font-weight: 600;
+        .stCheckbox>label, .stSelectbox>label, .stTextInput>label, .stDateInput>label, .stMultiSelect>label {
+            color: #444;
+            font-weight: 600;
         }
     </style>
 """, unsafe_allow_html=True)
-
-# --- Header ---
 st.markdown("""
-    <h1 style='color:#2b5876; text-align:center;'>📥 JC Email Attachment Downloader</h1>
-    <p style='text-align:center; color:#555;'>Easily extract and download email attachments by date, subject, and more – now with a stylish interface!</p>
+    <div style='background: linear-gradient(to right, #00b09b, #96c93d); padding: 2rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); text-align: center;'>
+        <h1 style='color: white; margin-bottom: 0.2em;'>📥 JC Email Attachment Downloader</h1>
+        <p style='color: white; font-size: 1.1em;'>Easily extract and download email attachments by date, subject, and more – now with a stylish interface!</p>
+    </div>
 """, unsafe_allow_html=True)
 
-# --- Email Credentials ---
 creds = load_credentials()
 account_type = st.selectbox("📡 Email Provider", ["Gmail", "Outlook"], index=0, key="account_type")
-col1, col2 = st.columns(2)
+st.markdown("""
+    <div style='background-color: #ffffff; padding: 1.5rem; border-radius: 10px; margin-top: 2rem; box-shadow: 0 0 12px rgba(0,0,0,0.05);'>
+""", unsafe_allow_html=True)
+col1, col2 = st.columns([1, 1])
 
 with col1:
     email_user = st.text_input("📧 Email Address", value=creds.get("email", ""))
     email_pass = st.text_input("🔒 App Password", type="password", value=creds.get("password", ""))
     st.caption("ℹ️ For Outlook accounts, use an App Password if two-factor authentication is enabled.")
     save_creds = st.checkbox("Remember credentials (store locally)")
-    mailbox = st.selectbox("📂 Folder to search", ["inbox", "[Gmail]/Sent Mail", "[Gmail]/All Mail", "[Gmail]/Drafts", "[Gmail]/Starred", "[Gmail]/Important", "[Gmail]/Spam", "[Gmail]/Trash"])
+    mailbox_options = ["inbox", "[Gmail]/Sent Mail", "[Gmail]/All Mail", "[Gmail]/Drafts", "[Gmail]/Starred", "[Gmail]/Important", "[Gmail]/Spam", "[Gmail]/Trash"]
+    mailbox = st.selectbox("📂 Folder/Label to search", options=mailbox_options, index=0)
     save_folder = "downloads"
 
 with col2:
@@ -74,13 +85,13 @@ with col2:
     end_date = st.date_input("📅 End Date", value=datetime.date.today())
     subject_filter = st.text_input("🔍 Subject contains")
     sender_filter = st.text_input("👤 Sender contains")
-    body_filters = st.text_input("✉️ Body contains (comma-separated: resume, cv, job)")
-    file_types = st.multiselect("📎 Attachment types", [".pdf", ".docx", ".jpg", ".png"], default=[".pdf", ".docx"])
-    custom_types = st.text_input("➕ Additional file types (comma-separated: .zip, .mp3)")
+    body_filters = st.text_input("✉️ Body contains (comma-separated: rsm, cv, resume)")
+    file_types = st.multiselect("📎 Attachment types to download", [".pdf", ".docx", ".jpg", ".png"], default=[".pdf", ".docx"])
+    custom_types = st.text_input("➕ Add custom file types (comma-separated: .mp3, .zip)")
     if custom_types:
         file_types += [ft.strip() for ft in custom_types.split(",") if ft.strip().startswith(".")]
 
-# --- Control Buttons ---
+# --- Buttons and Logging ---
 st.markdown("---")
 col_stop, col_start = st.columns([1, 6])
 with col_stop:
@@ -90,9 +101,9 @@ with col_start:
 
 status_text = st.empty()
 progress = st.empty()
+st.markdown("### 📋 Live Log")
 log_box = st.empty()
 
-# --- Button Logic ---
 if stop_button:
     st.session_state["stop_requested"] = True
 
@@ -105,16 +116,19 @@ if start_button:
         save_credentials(email_user, email_pass)
 
     os.makedirs(save_folder, exist_ok=True)
-    body_keywords = [w.strip().lower() for w in body_filters.split(",") if w.strip()]
+    body_keywords = [word.strip().lower() for word in body_filters.split(",") if word.strip()] if body_filters else []
 
     try:
         imap_server = "imap.gmail.com" if account_type == "Gmail" else "outlook.office365.com"
         imap = imaplib.IMAP4_SSL(imap_server)
-        imap.login(email_user, email_pass)
+        try:
+            imap.login(email_user, email_pass)
+        except imaplib.IMAP4.error as login_error:
+            raise Exception("Login failed. Please check your email/password. If using Outlook, generate an App Password from your account security settings.") from login_error
 
         status, _ = imap.select(f'"{mailbox}"')
         if status != "OK":
-            raise Exception(f"Unable to access folder: {mailbox}")
+            raise Exception(f"Unable to access folder: {mailbox}. Please check folder name or IMAP label.")
 
         since = start_date.strftime('%d-%b-%Y')
         before = (end_date + datetime.timedelta(days=1)).strftime('%d-%b-%Y')
@@ -130,7 +144,7 @@ if start_button:
                 break
 
             status_text.text(f"📨 Reading email {idx} of {total}...")
-            _, msg_data = imap.fetch(email_id, "(RFC822)")
+            res, msg_data = imap.fetch(email_id, "(RFC822)")
             msg = email.message_from_bytes(msg_data[0][1])
 
             subject = msg.get("Subject", "")
@@ -147,11 +161,11 @@ if start_button:
             else:
                 body = msg.get_payload(decode=True).decode(errors='ignore')
 
-            if subject_filter.lower() not in subject.lower() if subject_filter else False:
+            if subject_filter and subject_filter.lower() not in subject.lower():
                 continue
-            if sender_filter.lower() not in from_email.lower() if sender_filter else False:
+            if sender_filter and sender_filter.lower() not in from_email.lower():
                 continue
-            if body_keywords and not any(k in body.lower() for k in body_keywords):
+            if body_keywords and not any(keyword in body.lower() for keyword in body_keywords):
                 continue
 
             for part in msg.walk():
@@ -162,7 +176,7 @@ if start_button:
                         if isinstance(decoded_filename, bytes):
                             decoded_filename = decoded_filename.decode()
 
-                        if not any(decoded_filename.lower().endswith(ft) for ft in file_types):
+                        if not any(decoded_filename.lower().endswith(ft.lower()) for ft in file_types):
                             continue
 
                         email_date = email.utils.parsedate_to_datetime(msg["Date"])
@@ -187,6 +201,7 @@ if start_button:
 
         imap.logout()
 
+        # Create zip of saved files
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, _, files in os.walk(save_folder):
@@ -204,5 +219,5 @@ if start_button:
     log.append(f"📁 Files saved in: {save_folder}")
     log.append("✅ Done.")
     status_text.text("✔️ Complete.")
-    log_box.text("\n".join(log[-10:]))
+    log_box.markdown(f"<div style='background-color:#f0f2f6;padding:1rem;border-radius:8px;'><pre style='font-size:0.85em'>{chr(10).join(log[-10:])}</pre></div>", unsafe_allow_html=True)
     st.download_button(label="⬇️ Download Attachments (ZIP)", data=zip_buffer, file_name="attachments.zip", mime="application/zip")
